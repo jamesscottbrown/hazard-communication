@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Simulation Animation</title>
+    <script src="https://d3js.org/d3.v5.min.js"></script>
+</head>
+<body>
+
+<h1>Simulated fatalities for each scenario</h1>
+
+<svg></svg>
+
+<div>
+    <label for="animate">Animate samples</label>
+    <input id="animate" type="checkbox" onclick="toggleAnimation()" checked="true">
+    <br />
+    <label for="colors">Show colors</label>
+    <input id="colors" type="checkbox" onclick="toggleColors()" checked="true">
+    <br />
+    <label for="speed">Animation speed</label>
+    <input id="speed" type="range" min="10" max="100" value="40" class="slider" onchange="updateSpeed()">
+</div>
+
+<p>
+    In this diagram, the ticks indicate the <b>lower quartile</b>, <b>median</b> and <b>upper quartile</b> number of fatalities for each scenario. Half of all simulations gave a number of fatalities that was less than or equal to the value represented by the middle tick.
+</p>
+
+<p>The horizontal line ranges from the minimum to maximum values obtained from the simulations. </p>
+
+<p>Points are animated: at each time, each circle indicates the outcome of a single simulation.</p>
+
+<script>
+
+    function toggleAnimation(){
+        const circles = d3.selectAll(".animated-circles");
+        circles.style('visibility', circles.style('visibility') === 'hidden' ? 'visible' : 'hidden');
+    }
+
+    let showColors = true;
+    function toggleColors(){
+        showColors = !showColors;
+    }
+
+    let speed = 50;
+    function updateSpeed(){
+        speed = 10 + (+document.getElementById('speed').max) - (+document.getElementById('speed').value);
+        console.log(`Speed: ${speed}`)
+    }
+
+
+
+    d3.csv('Non-evacuated_sampled_example1.csv')
+        .then(data => {
+
+            const getMax = (columnName) => d3.max(data.map(d => +d[columnName]));
+            const getMin = (columnName) => d3.min(data.map(d => +d[columnName]));
+            const getMedian = (columnName) => d3.median(data.map(d => +d[columnName]));
+            const getUpper = (columnName) => d3.quantile(data.map(d => +d[columnName]), 0.75);
+            const getLower = (columnName) => d3.quantile(data.map(d => +d[columnName]), 0.25);
+
+
+            const maxFatalities = d3.max([
+                d3.max(data.map(d => +d['Day.1.Fatalities'])),
+                d3.max(data.map(d => +d['Day.2.Fatalities'])),
+                d3.max(data.map(d => +d['Day.3.Fatalities']))
+            ]);
+
+            const width = 500;
+            const height = 100;
+            const margin = {top: 20, right: 10, bottom: 40, left: 60};
+
+            const xScale = d3.scaleLinear().range([0, width]).domain([0, maxFatalities]);
+            const yScale = d3.scaleLinear().range([0, height]).domain([0, 3]);
+
+            let svg = d3.select('svg')
+                .attr('width', width + margin.left + margin.right)
+                .attr('height', height + margin.top + margin.bottom);
+
+
+            svg = svg.append("g")
+                .attr("transform", "translate(" + margin.left + "," + margin.top + ")");
+
+
+            let tableRow = 0;
+
+            const radius = 7;
+
+            // const colors= [ 'red', 'green', 'blue'];
+            // const colors = ['#edf8b1', '#7fcdbb', '#2c7fb8'];
+
+            const colors = ['black', 'black', 'black'];
+
+
+            // plot each simulation result as a small point
+            const colNames = ['Day.1.Fatalities', 'Day.2.Fatalities', 'Day.3.Fatalities'];
+
+            const aggregatedPointDivs = svg.append('g').attr('id', 'aggregated-points')
+                .selectAll('g')
+                .data(colNames)
+                .enter()
+                .append('g')
+                .style('transform', (d,i) => `translate(0, ${yScale(i)}px)`);
+
+            aggregatedPointDivs
+                .selectAll('g')
+                .data(d => { console.log(d); return data.map(d2 => d2[d])} )
+                .enter()
+                .append('circle')
+                .attr('cx', d => xScale(d))
+                .attr('cy', 0)
+                .attr('r', 3)
+                .attr('fill', 'grey')
+                .attr('opacity', 0.2);
+
+
+            let tickDivs = svg.append('g')
+                .selectAll('g')
+                .data(['Day.1.Fatalities', 'Day.2.Fatalities', 'Day.3.Fatalities'])
+                .enter()
+                .append('g');
+
+            /*
+            tickDivs
+                .append('line')
+                .attr('x1', d => xScale(getMax(d)))
+                .attr('x2', d => xScale(getMax(d)))
+                .attr('y1', (d, i) => yScale(i) - radius / 2)
+                .attr('y2', (d, i) => yScale(i) + radius / 2)
+                .attr('stroke', 'black');
+
+            tickDivs
+                .append('line')
+                .attr('x1', d => xScale(getMin(d)))
+                .attr('x2', d => xScale(getMin(d)))
+                .attr('y1', (d, i) => yScale(i) - radius / 2)
+                .attr('y2', (d, i) => yScale(i) + radius / 2)
+                .attr('stroke', 'black');
+*/
+
+            const tickHeight = 6;
+
+            tickDivs
+                .append('line')
+                .attr('x1', d => xScale(getMedian(d)))
+                .attr('x2', d => xScale(getMedian(d)))
+                .attr('y1', (d, i) => yScale(i) - tickHeight)
+                .attr('y2', (d, i) => yScale(i) + tickHeight)
+                .attr('stroke', 'black');
+
+
+            tickDivs
+                .append('line')
+                .attr('x1', d => xScale(getUpper(d)))
+                .attr('x2', d => xScale(getUpper(d)))
+                .attr('y1', (d, i) => yScale(i) - tickHeight)
+                .attr('y2', (d, i) => yScale(i) + tickHeight)
+                .attr('stroke', 'black');
+
+            tickDivs
+                .append('line')
+                .attr('x1', d => xScale(getLower(d)))
+                .attr('x2', d => xScale(getLower(d)))
+                .attr('y1', (d, i) => yScale(i) - tickHeight)
+                .attr('y2', (d, i) => yScale(i) + tickHeight)
+                .attr('stroke', 'black');
+
+
+            tickDivs
+                .append('line')
+                .attr('x1', d => xScale(getMin(d)))
+                .attr('x2', d => xScale(getMax(d)))
+                .attr('y1', (d, i) => yScale(i))
+                .attr('y2', (d, i) => yScale(i))
+                .attr('stroke', 'grey');
+
+
+
+            let labelDiv = svg.append('g')
+                .attr("transform", `translate(-${margin.left}, 0)`)
+                .selectAll('g')
+                .data(['Day 1', 'Day 2', 'Day 3'])
+                .enter()
+                .append('text')
+                .text(d => d)
+                .attr('x', 0)
+                .attr('y', (d, i) => yScale(i) + 10);
+
+            labelDiv.attr('y', function (d,i){
+                return yScale(i) + this.getBBox().height/4;
+            });
+
+
+            // animated large circles
+            svg.append('g')
+                .selectAll('circle')
+                .data(['Day.1.Fatalities', 'Day.2.Fatalities', 'Day.3.Fatalities'])
+                .enter()
+                .append('circle')
+                .attr('cx', d => xScale(+data[tableRow][d]))
+                .attr('cy', (d, i) => yScale(i))
+                .attr('r', radius)
+                .attr('fill', (d, i) => colors[i])
+                .attr('id', d => d)
+                .classed('animated-circles', true);
+
+
+            getRandomInt = (max) => Math.floor(Math.random() * Math.floor(max));
+
+
+            iterate = function () {
+
+                const allValues = d3.selectAll('.animated-circles').nodes().map(d => +d.attributes.cx.nodeValue );
+
+                d3.selectAll('.animated-circles')
+                    .attr('fill', function(){
+
+                        if (!showColors){ return 'black'; }
+
+                        const thisVal = d3.select(this).attr("cx");
+
+                        if ( Math.abs(thisVal - d3.min(allValues)) < 1){
+                            return 'blue';
+                        } else if (Math.abs(thisVal - d3.max(allValues)) < 1){
+                            return 'red';
+                        }
+                        return 'black';
+
+                    }  );
+
+
+                tableRow++;
+
+                if (tableRow >= data.length) {
+                    tableRow = 0;
+                }
+
+                d3.selectAll('.animated-circles')
+                    .transition()
+                    //.attr('cx', d => xScale(+data[tableRow][d]))
+                    .attr('cx', d => xScale(+data[getRandomInt(data.length)][d]))
+                    .delay(50)
+                    .duration(speed)
+                    //.ease(d3.easeBounce); // Use the Bounce Transition Ease
+                    .on('end', iterate);
+
+            };
+
+            iterate();
+
+
+            const xAxis = d3.axisBottom(xScale)
+                .tickSizeInner(5)
+                .tickSizeOuter(10);
+
+            svg.append('g')
+                .classed('x axis', true)
+                .style('transform', `translate(0, ${height}px)`)
+                .call(xAxis);
+
+            const axisLabel = svg.append('text')
+                .text('Fatalities')
+                .attr("x", width/2)
+                .attr("y", height + 30);
+
+            axisLabel.attr("x", width/2 - axisLabel.node().getBBox().width/2);
+        })
+
+</script>
+
+</body>
+</html>
